@@ -13,6 +13,8 @@ Piedra, papel o tijera multijugador en tiempo real. Crea una sala, comparte el c
    - Si aparecen exactamente dos jugadas distintas, quienes eligieron la jugada perdedora quedan **eliminados**.
 6. Se repite hasta que quede un solo jugador: ¡ese es el ganador!
 
+Cada ronda tiene un límite de **5 segundos** para jugar: quien no responde queda eliminado esa ronda. Si un jugador acumula **3 rondas seguidas** sin responder, se lo expulsa automáticamente de la sala.
+
 ## Correr localmente
 
 ```bash

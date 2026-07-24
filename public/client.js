@@ -104,6 +104,11 @@ btnLeave.addEventListener('click', () => {
   socket.emit('leave-room', () => goHome());
 });
 
+socket.on('kicked', ({ reason }) => {
+  goHome();
+  showError(reason || 'Fuiste expulsado de la sala.');
+});
+
 btnReady.addEventListener('click', () => socket.emit('toggle-ready'));
 btnPlayAgain.addEventListener('click', () => socket.emit('play-again'));
 
@@ -205,7 +210,7 @@ socket.on('state', (state) => {
     } else if (me?.hasMoved) {
       myMoveStatus.textContent = 'Jugada enviada, esperando al resto…';
     } else {
-      myMoveStatus.textContent = 'Elige tu jugada.';
+      myMoveStatus.textContent = 'Elige tu jugada. Tienes 5 segundos.';
     }
   }
 

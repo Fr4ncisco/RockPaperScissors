@@ -7,6 +7,8 @@ const PORT = process.env.PORT || 3000;
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 6;
 const MOVES = ['piedra', 'papel', 'tijera'];
+const ROUND_TIMEOUT_MS = 5000;
+const MAX_MISSED_TURNS = 3;
 
 // piedra > tijera, tijera > papel, papel > piedra
 const BEATS = { piedra: 'tijera', tijera: 'papel', papel: 'piedra' };
@@ -31,11 +33,12 @@ function makeRoomCode() {
 function createRoom(code) {
   const room = {
     code,
-    players: new Map(), // socketId -> { name, eliminated, ready, move, lastMove, connected }
+    players: new Map(), // socketId -> { name, eliminated, ready, move, lastMove, missedTurns, connected }
     wins: new Map(), // socketId -> victorias acumuladas en la sala
     round: 1,
     status: 'lobby', // lobby | playing | finished
     log: [],
+    roundTimer: null,
   };
   rooms.set(code, room);
   return room;
@@ -75,7 +78,83 @@ function maybeStartGame(room) {
     p.move = null;
     p.lastMove = null;
     p.ready = false;
+    p.missedTurns = 0;
   }
+  scheduleRoundTimer(room);
+}
+
+function clearRoundTimer(room) {
+  if (room.roundTimer) {
+    clearTimeout(room.roundTimer);
+    room.roundTimer = null;
+  }
+}
+
+function scheduleRoundTimer(room) {
+  clearRoundTimer(room);
+  room.roundTimer = setTimeout(() => onRoundTimeout(room), ROUND_TIMEOUT_MS);
+}
+
+function finishGame(room, winnerEntry) {
+  room.status = 'finished';
+  clearRoundTimer(room);
+  if (winnerEntry) {
+    const [winnerId] = winnerEntry;
+    room.wins.set(winnerId, (room.wins.get(winnerId) || 0) + 1);
+  }
+  io.to(room.code).emit('game-over', {
+    winner: winnerEntry ? { id: winnerEntry[0], name: winnerEntry[1].name } : null,
+  });
+  broadcastState(room);
+}
+
+function onRoundTimeout(room) {
+  room.roundTimer = null;
+  if (room.status !== 'playing') return;
+
+  const active = activePlayers(room);
+  const notMoved = active.filter(([, p]) => p.move === null);
+  if (!notMoved.length) return;
+
+  const timedOut = [];
+  const kicked = [];
+  for (const [id, p] of notMoved) {
+    p.missedTurns += 1;
+    if (p.missedTurns >= MAX_MISSED_TURNS) {
+      kicked.push({ id, name: p.name });
+    } else {
+      p.eliminated = true;
+      timedOut.push({ id, name: p.name });
+    }
+  }
+
+  for (const { id } of kicked) {
+    room.players.delete(id);
+    const kickedSocket = io.sockets.sockets.get(id);
+    if (kickedSocket) {
+      kickedSocket.emit('kicked', {
+        reason: `No respondiste a ${MAX_MISSED_TURNS} rondas seguidas.`,
+      });
+      kickedSocket.leave(room.code);
+    }
+  }
+
+  if (room.players.size === 0) {
+    clearRoundTimer(room);
+    rooms.delete(room.code);
+    return;
+  }
+
+  io.to(room.code).emit('round-result', {
+    round: room.round,
+    moves: active
+      .filter(([, p]) => p.move !== null)
+      .map(([id, p]) => ({ id, name: p.name, move: p.move })),
+    result: 'tiempo agotado',
+    eliminated: [...timedOut, ...kicked].map((x) => ({ id: x.id, name: x.name, move: null })),
+  });
+
+  tryResolveRound(room);
 }
 
 function broadcastState(room) {
@@ -94,8 +173,12 @@ function resetMoves(room) {
 }
 
 function tryResolveRound(room) {
+  if (room.status !== 'playing') return;
   const active = activePlayers(room);
-  if (active.length === 0) return;
+  if (active.length <= 1) {
+    finishGame(room, active[0] || null);
+    return;
+  }
   const allMoved = active.every(([, p]) => p.move !== null);
   if (!allMoved) return;
 
@@ -110,6 +193,7 @@ function tryResolveRound(room) {
     });
     resetMoves(room);
     room.round += 1;
+    scheduleRoundTimer(room);
     broadcastState(room);
     io.to(room.code).emit('round-result', {
       round: room.round - 1,
@@ -139,33 +223,20 @@ function tryResolveRound(room) {
   });
 
   const survivors = activePlayers(room);
-  if (survivors.length <= 1) {
-    room.status = 'finished';
-    const winner = survivors[0];
-    if (winner) {
-      const [winnerId] = winner;
-      room.wins.set(winnerId, (room.wins.get(winnerId) || 0) + 1);
-    }
-    io.to(room.code).emit('round-result', {
-      round: room.round,
-      moves: roundMoves,
-      result: `gana ${winningMove}`,
-      eliminated,
-    });
-    io.to(room.code).emit('game-over', {
-      winner: winner ? { id: winner[0], name: winner[1].name } : null,
-    });
-    broadcastState(room);
-    return;
-  }
-
-  room.round += 1;
   io.to(room.code).emit('round-result', {
-    round: room.round - 1,
+    round: room.round,
     moves: roundMoves,
     result: `gana ${winningMove}`,
     eliminated,
   });
+
+  if (survivors.length <= 1) {
+    finishGame(room, survivors[0] || null);
+    return;
+  }
+
+  room.round += 1;
+  scheduleRoundTimer(room);
   broadcastState(room);
 }
 
@@ -195,6 +266,7 @@ io.on('connection', (socket) => {
       ready: false,
       move: null,
       lastMove: null,
+      missedTurns: 0,
       connected: true,
     });
     // La composición de la sala cambió: todos vuelven a confirmar que están listos.
@@ -228,6 +300,7 @@ io.on('connection', (socket) => {
     const player = room.players.get(socket.id);
     if (!player || player.eliminated) return;
     player.move = move;
+    player.missedTurns = 0;
     broadcastState(room);
     tryResolveRound(room);
   });
@@ -235,6 +308,7 @@ io.on('connection', (socket) => {
   socket.on('play-again', () => {
     const room = rooms.get(currentRoomCode);
     if (!room) return;
+    clearRoundTimer(room);
     room.status = 'lobby';
     room.round = 1;
     room.log = [];
@@ -243,6 +317,7 @@ io.on('connection', (socket) => {
       p.ready = false;
       p.move = null;
       p.lastMove = null;
+      p.missedTurns = 0;
     }
     broadcastState(room);
   });
@@ -266,6 +341,7 @@ function removePlayerFromRoom(room, socket, { intentional }) {
   }
 
   if (room.players.size === 0 || [...room.players.values()].every((p) => !p.connected)) {
+    clearRoundTimer(room);
     rooms.delete(room.code);
     return;
   }
