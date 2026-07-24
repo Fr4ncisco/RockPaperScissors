@@ -159,17 +159,6 @@ button.danger {
 
 button.danger:hover:not(:disabled) { background: #fca5a5; }
 
-.wins-board {
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-bottom: 16px;
-  font-size: 0.85rem;
-  color: var(--muted);
-  text-align: center;
-}
-
 .player-list {
   list-style: none;
   margin: 0 0 16px;
@@ -192,6 +181,34 @@ button.danger:hover:not(:disabled) { background: #fca5a5; }
 .player-list li.eliminated {
   opacity: 0.4;
   text-decoration: line-through;
+}
+
+.player-list li.leader {
+  border: 1px solid var(--ok);
+  background: #0f2419;
+}
+
+.player-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.score {
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.player-list li.leader .score { color: var(--ok); }
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tag {

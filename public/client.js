@@ -14,7 +14,6 @@ const homeError = document.getElementById('home-error');
 const roomCodeEl = document.getElementById('room-code');
 const btnCopy = document.getElementById('btn-copy');
 const btnLeave = document.getElementById('btn-leave');
-const winsBoard = document.getElementById('wins-board');
 
 const lobbyInfo = document.getElementById('lobby-info');
 const playersCount = document.getElementById('players-count');
@@ -80,7 +79,6 @@ function enterRoom(code) {
 function goHome() {
   screenRoom.classList.add('hidden');
   screenHome.classList.remove('hidden');
-  winsBoard.classList.add('hidden');
   [...moveButtons.children].forEach((b) => {
     b.classList.remove('selected');
     b.disabled = false;
@@ -117,22 +115,30 @@ moveButtons.addEventListener('click', (e) => {
   socket.emit('play-move', { move: myMove });
 });
 
-function renderWinsBoard(players) {
-  const withWins = players.filter((p) => p.wins > 0);
-  if (!withWins.length) {
-    winsBoard.classList.add('hidden');
-    return;
-  }
-  const sorted = [...players].sort((a, b) => b.wins - a.wins);
-  winsBoard.innerHTML =
-    '🏆 Historial: ' +
-    sorted.map((p) => `${p.name}${p.id === myId ? ' (tú)' : ''}: ${p.wins}`).join(' · ');
-  winsBoard.classList.remove('hidden');
+function withLeaderFlag(players) {
+  const maxWins = Math.max(0, ...players.map((p) => p.wins));
+  return players.map((p) => ({ ...p, isLeader: maxWins > 0 && p.wins === maxWins }));
+}
+
+function buildScoreGroup(p) {
+  const left = document.createElement('span');
+  left.className = 'player-left';
+
+  const scoreSpan = document.createElement('span');
+  scoreSpan.className = 'score';
+  scoreSpan.textContent = (p.isLeader ? '🏆 ' : '') + p.wins;
+  left.appendChild(scoreSpan);
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'name';
+  nameSpan.textContent = p.name + (p.id === myId ? ' (tú)' : '');
+  left.appendChild(nameSpan);
+
+  return left;
 }
 
 socket.on('state', (state) => {
-  renderWinsBoard(state.players);
-
+  const players = withLeaderFlag(state.players);
   const isLobby = state.status === 'lobby';
   const isPlaying = state.status === 'playing';
   const isFinished = state.status === 'finished';
@@ -142,21 +148,20 @@ socket.on('state', (state) => {
   finishedInfo.classList.toggle('hidden', !isFinished);
 
   if (isLobby) {
-    playersCount.textContent = `${state.players.length} / ${state.maxPlayers} jugadores`;
+    playersCount.textContent = `${players.length} / ${state.maxPlayers} jugadores`;
     playerList.innerHTML = '';
-    state.players.forEach((p) => {
+    players.forEach((p) => {
       const li = document.createElement('li');
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = p.name + (p.id === myId ? ' (tú)' : '');
-      li.appendChild(nameSpan);
+      li.classList.toggle('leader', p.isLeader);
+      li.appendChild(buildScoreGroup(p));
       const tag = document.createElement('span');
       tag.className = 'tag' + (p.ready ? ' ready' : '');
       tag.textContent = p.ready ? 'Listo' : 'Esperando';
       li.appendChild(tag);
       playerList.appendChild(li);
     });
-    const me = state.players.find((p) => p.id === myId);
-    btnReady.disabled = state.players.length < state.minPlayers;
+    const me = players.find((p) => p.id === myId);
+    btnReady.disabled = players.length < state.minPlayers;
     btnReady.classList.toggle('selected', !!me?.ready);
     btnReady.textContent = me?.ready ? 'Cancelar' : 'Estoy listo';
     myMove = null;
@@ -165,15 +170,18 @@ socket.on('state', (state) => {
   if (isPlaying) {
     roundLabel.textContent = `Ronda ${state.round}`;
     playerListGame.innerHTML = '';
-    state.players.forEach((p) => {
+    players.forEach((p) => {
       const li = document.createElement('li');
       li.classList.toggle('eliminated', p.eliminated);
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = p.name + (p.id === myId ? ' (tú)' : '');
-      li.appendChild(nameSpan);
+      li.classList.toggle('leader', p.isLeader);
+      li.appendChild(buildScoreGroup(p));
       if (!p.eliminated) {
         const tag = document.createElement('span');
-        if (p.hasMoved) {
+        if (p.id === myId && myMove) {
+          tag.className = 'tag lastmove';
+          tag.textContent = MOVE_EMOJI[myMove];
+          tag.title = 'Tu jugada de esta ronda';
+        } else if (p.hasMoved) {
           tag.className = 'tag ready';
           tag.textContent = 'Listo';
         } else if (p.lastMove) {
@@ -189,7 +197,7 @@ socket.on('state', (state) => {
       playerListGame.appendChild(li);
     });
 
-    const me = state.players.find((p) => p.id === myId);
+    const me = players.find((p) => p.id === myId);
     const iAmEliminated = me?.eliminated;
     [...moveButtons.children].forEach((b) => (b.disabled = iAmEliminated || me?.hasMoved));
     if (iAmEliminated) {
