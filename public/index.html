@@ -9,7 +9,7 @@
 <body>
   <div class="wrap">
     <header>
-      <h1>🪨📄✂️ Cachipún Online</h1>
+      <h1>✊✋✌️ Cachipún Online</h1>
       <p class="subtitle">Piedra, papel o tijera — en tiempo real, de 2 a 6 jugadores</p>
     </header>
 
@@ -45,14 +45,19 @@
             <span class="label">Sala</span>
             <span id="room-code" class="room-code"></span>
           </div>
-          <button id="btn-copy" title="Copiar enlace de invitación">Copiar enlace</button>
+          <div class="room-actions">
+            <button id="btn-copy" title="Copiar enlace de invitación">Copiar enlace</button>
+            <button id="btn-leave" class="danger" title="Salir de la sala">Salir</button>
+          </div>
         </div>
+
+        <div id="wins-board" class="wins-board hidden"></div>
 
         <div id="lobby-info" class="lobby-info">
           <p id="players-count"></p>
           <ul id="player-list" class="player-list"></ul>
-          <button id="btn-start" class="primary" disabled>Iniciar partida</button>
-          <p class="hint">Se necesitan mínimo 2 jugadores y máximo 6.</p>
+          <button id="btn-ready" class="primary" disabled>Estoy listo</button>
+          <p class="hint">Se necesitan mínimo 2 jugadores. La partida comienza sola cuando todos estén listos.</p>
         </div>
 
         <div id="game-info" class="hidden">
@@ -60,9 +65,9 @@
           <ul id="player-list-game" class="player-list"></ul>
 
           <div id="move-buttons" class="moves">
-            <button class="move-btn" data-move="piedra">🪨<br />Piedra</button>
-            <button class="move-btn" data-move="papel">📄<br />Papel</button>
-            <button class="move-btn" data-move="tijera">✂️<br />Tijera</button>
+            <button class="move-btn" data-move="piedra">✊<br />Piedra</button>
+            <button class="move-btn" data-move="papel">✋<br />Papel</button>
+            <button class="move-btn" data-move="tijera">✌️<br />Tijera</button>
           </div>
           <p id="my-move-status" class="hint"></p>
 

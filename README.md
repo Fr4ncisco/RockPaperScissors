@@ -1,4 +1,4 @@
-# Cachipún Online 🪨📄✂️
+# Cachipún Online ✊✋✌️
 
 Piedra, papel o tijera multijugador en tiempo real. Crea una sala, comparte el código (o el enlace) con tus amigos, y jueguen entre **2 y 6 jugadores** desde el navegador.
 
@@ -6,8 +6,8 @@ Piedra, papel o tijera multijugador en tiempo real. Crea una sala, comparte el c
 
 1. Un jugador crea una sala y recibe un código de 4 caracteres.
 2. El resto se une con ese código (o abriendo el enlace compartido).
-3. Cuando hay entre 2 y 6 jugadores, cualquiera puede iniciar la partida.
-4. En cada ronda todos eligen piedra, papel o tijera en secreto.
+3. Cuando hay entre 2 y 6 jugadores, cada uno marca "Estoy listo"; la partida arranca sola en cuanto todos lo están.
+4. En cada ronda todos eligen piedra (✊), papel (✋) o tijera (✌️) en secreto.
 5. Cuando todos jugaron, se revela el resultado:
    - Si todos eligieron lo mismo, o las tres opciones aparecen a la vez, es **empate** y se repite la ronda.
    - Si aparecen exactamente dos jugadas distintas, quienes eligieron la jugada perdedora quedan **eliminados**.

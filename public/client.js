@@ -1,6 +1,6 @@
 const socket = io();
 
-const MOVE_EMOJI = { piedra: '🪨', papel: '📄', tijera: '✂️' };
+const MOVE_EMOJI = { piedra: '✊', papel: '✋', tijera: '✌️' };
 
 const screenHome = document.getElementById('screen-home');
 const screenRoom = document.getElementById('screen-room');
@@ -13,11 +13,13 @@ const homeError = document.getElementById('home-error');
 
 const roomCodeEl = document.getElementById('room-code');
 const btnCopy = document.getElementById('btn-copy');
+const btnLeave = document.getElementById('btn-leave');
+const winsBoard = document.getElementById('wins-board');
 
 const lobbyInfo = document.getElementById('lobby-info');
 const playersCount = document.getElementById('players-count');
 const playerList = document.getElementById('player-list');
-const btnStart = document.getElementById('btn-start');
+const btnReady = document.getElementById('btn-ready');
 
 const gameInfo = document.getElementById('game-info');
 const roundLabel = document.getElementById('round-label');
@@ -75,6 +77,21 @@ function enterRoom(code) {
   window.history.replaceState({}, '', url);
 }
 
+function goHome() {
+  screenRoom.classList.add('hidden');
+  screenHome.classList.remove('hidden');
+  winsBoard.classList.add('hidden');
+  [...moveButtons.children].forEach((b) => {
+    b.classList.remove('selected');
+    b.disabled = false;
+  });
+  const url = new URL(window.location.href);
+  url.searchParams.delete('sala');
+  window.history.replaceState({}, '', url);
+  myId = null;
+  myMove = null;
+}
+
 btnCopy.addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(window.location.href);
@@ -85,7 +102,11 @@ btnCopy.addEventListener('click', async () => {
   }
 });
 
-btnStart.addEventListener('click', () => socket.emit('start-game'));
+btnLeave.addEventListener('click', () => {
+  socket.emit('leave-room', () => goHome());
+});
+
+btnReady.addEventListener('click', () => socket.emit('toggle-ready'));
 btnPlayAgain.addEventListener('click', () => socket.emit('play-again'));
 
 moveButtons.addEventListener('click', (e) => {
@@ -96,7 +117,22 @@ moveButtons.addEventListener('click', (e) => {
   socket.emit('play-move', { move: myMove });
 });
 
+function renderWinsBoard(players) {
+  const withWins = players.filter((p) => p.wins > 0);
+  if (!withWins.length) {
+    winsBoard.classList.add('hidden');
+    return;
+  }
+  const sorted = [...players].sort((a, b) => b.wins - a.wins);
+  winsBoard.innerHTML =
+    '🏆 Historial: ' +
+    sorted.map((p) => `${p.name}${p.id === myId ? ' (tú)' : ''}: ${p.wins}`).join(' · ');
+  winsBoard.classList.remove('hidden');
+}
+
 socket.on('state', (state) => {
+  renderWinsBoard(state.players);
+
   const isLobby = state.status === 'lobby';
   const isPlaying = state.status === 'playing';
   const isFinished = state.status === 'finished';
@@ -110,10 +146,19 @@ socket.on('state', (state) => {
     playerList.innerHTML = '';
     state.players.forEach((p) => {
       const li = document.createElement('li');
-      li.textContent = p.name + (p.id === myId ? ' (tú)' : '');
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = p.name + (p.id === myId ? ' (tú)' : '');
+      li.appendChild(nameSpan);
+      const tag = document.createElement('span');
+      tag.className = 'tag' + (p.ready ? ' ready' : '');
+      tag.textContent = p.ready ? 'Listo' : 'Esperando';
+      li.appendChild(tag);
       playerList.appendChild(li);
     });
-    btnStart.disabled = state.players.length < state.minPlayers;
+    const me = state.players.find((p) => p.id === myId);
+    btnReady.disabled = state.players.length < state.minPlayers;
+    btnReady.classList.toggle('selected', !!me?.ready);
+    btnReady.textContent = me?.ready ? 'Cancelar' : 'Estoy listo';
     myMove = null;
   }
 
@@ -128,8 +173,17 @@ socket.on('state', (state) => {
       li.appendChild(nameSpan);
       if (!p.eliminated) {
         const tag = document.createElement('span');
-        tag.className = 'tag' + (p.hasMoved ? ' ready' : '');
-        tag.textContent = p.hasMoved ? 'Listo' : 'Pensando…';
+        if (p.hasMoved) {
+          tag.className = 'tag ready';
+          tag.textContent = 'Listo';
+        } else if (p.lastMove) {
+          tag.className = 'tag lastmove';
+          tag.textContent = MOVE_EMOJI[p.lastMove];
+          tag.title = 'Su jugada de la ronda anterior';
+        } else {
+          tag.className = 'tag';
+          tag.textContent = 'Pensando…';
+        }
         li.appendChild(tag);
       }
       playerListGame.appendChild(li);

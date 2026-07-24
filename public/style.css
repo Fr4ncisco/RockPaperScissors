@@ -101,6 +101,13 @@ button.primary {
 
 button.primary:hover:not(:disabled) { background: var(--accent); }
 
+button.primary.selected {
+  background: var(--ok);
+  color: #04120a;
+}
+
+button.primary.selected:hover:not(:disabled) { background: #86efac; }
+
 .divider {
   text-align: center;
   color: var(--muted);
@@ -137,7 +144,31 @@ button.primary:hover:not(:disabled) { background: var(--accent); }
   color: var(--accent);
 }
 
-#btn-copy { width: auto; }
+.room-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#btn-copy, #btn-leave { width: auto; }
+
+button.danger {
+  background: var(--danger);
+  color: #2a0a0a;
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) { background: #fca5a5; }
+
+.wins-board {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+}
 
 .player-list {
   list-style: none;
@@ -171,6 +202,7 @@ button.primary:hover:not(:disabled) { background: var(--accent); }
 }
 
 .tag.ready { background: var(--ok); color: #04120a; }
+.tag.lastmove { background: #334155; font-size: 0.95rem; padding: 2px 10px; }
 
 .hint {
   color: var(--muted);

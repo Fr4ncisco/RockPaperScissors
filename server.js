@@ -31,7 +31,8 @@ function makeRoomCode() {
 function createRoom(code) {
   const room = {
     code,
-    players: new Map(), // socketId -> { name, eliminated, move, connected }
+    players: new Map(), // socketId -> { name, eliminated, ready, move, lastMove, connected }
+    wins: new Map(), // socketId -> victorias acumuladas en la sala
     round: 1,
     status: 'lobby', // lobby | playing | finished
     log: [],
@@ -52,10 +53,29 @@ function publicState(room) {
       id,
       name: p.name,
       eliminated: p.eliminated,
+      ready: p.ready,
       hasMoved: room.status === 'playing' && !p.eliminated ? p.move !== null : false,
+      lastMove: p.lastMove || null,
+      wins: room.wins.get(id) || 0,
       connected: p.connected,
     })),
   };
+}
+
+function maybeStartGame(room) {
+  if (room.status !== 'lobby') return;
+  if (room.players.size < MIN_PLAYERS) return;
+  const allReady = [...room.players.values()].every((p) => p.ready);
+  if (!allReady) return;
+  room.status = 'playing';
+  room.round = 1;
+  room.log = [];
+  for (const p of room.players.values()) {
+    p.eliminated = false;
+    p.move = null;
+    p.lastMove = null;
+    p.ready = false;
+  }
 }
 
 function broadcastState(room) {
@@ -67,7 +87,10 @@ function activePlayers(room) {
 }
 
 function resetMoves(room) {
-  for (const p of room.players.values()) p.move = null;
+  for (const p of room.players.values()) {
+    if (p.move !== null) p.lastMove = p.move;
+    p.move = null;
+  }
 }
 
 function tryResolveRound(room) {
@@ -119,6 +142,10 @@ function tryResolveRound(room) {
   if (survivors.length <= 1) {
     room.status = 'finished';
     const winner = survivors[0];
+    if (winner) {
+      const [winnerId] = winner;
+      room.wins.set(winnerId, (room.wins.get(winnerId) || 0) + 1);
+    }
     io.to(room.code).emit('round-result', {
       round: room.round,
       moves: roundMoves,
@@ -165,26 +192,33 @@ io.on('connection', (socket) => {
     room.players.set(socket.id, {
       name: (name || 'Jugador').slice(0, 20),
       eliminated: false,
+      ready: false,
       move: null,
+      lastMove: null,
       connected: true,
     });
+    // La composición de la sala cambió: todos vuelven a confirmar que están listos.
+    for (const p of room.players.values()) p.ready = false;
     cb?.({ ok: true, code: room.code, playerId: socket.id });
     broadcastState(room);
   }
 
-  socket.on('start-game', () => {
+  socket.on('toggle-ready', () => {
     const room = rooms.get(currentRoomCode);
     if (!room) return;
     if (room.status !== 'lobby') return;
-    if (room.players.size < MIN_PLAYERS) return;
-    room.status = 'playing';
-    room.round = 1;
-    room.log = [];
-    for (const p of room.players.values()) {
-      p.eliminated = false;
-      p.move = null;
-    }
+    const player = room.players.get(socket.id);
+    if (!player) return;
+    player.ready = !player.ready;
+    maybeStartGame(room);
     broadcastState(room);
+  });
+
+  socket.on('leave-room', (cb) => {
+    const room = rooms.get(currentRoomCode);
+    if (room) removePlayerFromRoom(room, socket, { intentional: true });
+    currentRoomCode = null;
+    cb?.({ ok: true });
   });
 
   socket.on('play-move', ({ move }) => {
@@ -206,32 +240,40 @@ io.on('connection', (socket) => {
     room.log = [];
     for (const p of room.players.values()) {
       p.eliminated = false;
+      p.ready = false;
       p.move = null;
+      p.lastMove = null;
     }
     broadcastState(room);
   });
 
   socket.on('disconnect', () => {
     const room = rooms.get(currentRoomCode);
-    if (!room) return;
-    const player = room.players.get(socket.id);
-    if (!player) return;
-
-    if (room.status === 'lobby') {
-      room.players.delete(socket.id);
-    } else {
-      player.connected = false;
-    }
-
-    if (room.players.size === 0 || [...room.players.values()].every((p) => !p.connected)) {
-      rooms.delete(room.code);
-      return;
-    }
-
-    if (room.status === 'playing') tryResolveRound(room);
-    broadcastState(room);
+    if (room) removePlayerFromRoom(room, socket, { intentional: false });
+    currentRoomCode = null;
   });
 });
+
+function removePlayerFromRoom(room, socket, { intentional }) {
+  const player = room.players.get(socket.id);
+  if (!player) return;
+  socket.leave(room.code);
+
+  if (room.status === 'lobby' || intentional) {
+    room.players.delete(socket.id);
+  } else {
+    player.connected = false;
+  }
+
+  if (room.players.size === 0 || [...room.players.values()].every((p) => !p.connected)) {
+    rooms.delete(room.code);
+    return;
+  }
+
+  if (room.status === 'lobby') maybeStartGame(room);
+  if (room.status === 'playing') tryResolveRound(room);
+  broadcastState(room);
+}
 
 httpServer.listen(PORT, () => {
   console.log(`Cachipún online escuchando en el puerto ${PORT}`);
