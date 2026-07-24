@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cachipún Online</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🪨📄✂️ Cachipún Online</h1>
+      <p class="subtitle">Piedra, papel o tijera — en tiempo real, de 2 a 6 jugadores</p>
+    </header>
+
+    <section id="screen-home" class="screen">
+      <div class="card">
+        <label>
+          Tu nombre
+          <input id="input-name" type="text" maxlength="20" placeholder="Ej: Fran" />
+        </label>
+
+        <div class="actions">
+          <button id="btn-create" class="primary">Crear sala</button>
+        </div>
+
+        <div class="divider">o</div>
+
+        <label>
+          Código de sala
+          <input id="input-code" type="text" maxlength="4" placeholder="Ej: A1B2" style="text-transform:uppercase" />
+        </label>
+        <div class="actions">
+          <button id="btn-join">Unirse a sala</button>
+        </div>
+
+        <p id="home-error" class="error"></p>
+      </div>
+    </section>
+
+    <section id="screen-room" class="screen hidden">
+      <div class="card">
+        <div class="room-header">
+          <div>
+            <span class="label">Sala</span>
+            <span id="room-code" class="room-code"></span>
+          </div>
+          <button id="btn-copy" title="Copiar enlace de invitación">Copiar enlace</button>
+        </div>
+
+        <div id="lobby-info" class="lobby-info">
+          <p id="players-count"></p>
+          <ul id="player-list" class="player-list"></ul>
+          <button id="btn-start" class="primary" disabled>Iniciar partida</button>
+          <p class="hint">Se necesitan mínimo 2 jugadores y máximo 6.</p>
+        </div>
+
+        <div id="game-info" class="hidden">
+          <p id="round-label" class="round-label"></p>
+          <ul id="player-list-game" class="player-list"></ul>
+
+          <div id="move-buttons" class="moves">
+            <button class="move-btn" data-move="piedra">🪨<br />Piedra</button>
+            <button class="move-btn" data-move="papel">📄<br />Papel</button>
+            <button class="move-btn" data-move="tijera">✂️<br />Tijera</button>
+          </div>
+          <p id="my-move-status" class="hint"></p>
+
+          <div id="last-result" class="last-result"></div>
+        </div>
+
+        <div id="finished-info" class="hidden">
+          <h2 id="winner-label"></h2>
+          <button id="btn-play-again" class="primary">Jugar otra vez</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
